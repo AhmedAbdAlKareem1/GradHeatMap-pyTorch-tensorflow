@@ -168,6 +168,8 @@ numpy<2
 
 opencv-python>=4.7
 
+requires-python>=3.8
+
 Model must contain at least one Conv2D or DepthwiseConv2D layer.
 
 
@@ -176,6 +178,7 @@ Model must contain at least one Conv2D or DepthwiseConv2D layer.
 
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
 
 
 
