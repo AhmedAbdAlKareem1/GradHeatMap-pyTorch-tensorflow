@@ -86,9 +86,11 @@ bash
 pip install git+https://github.com/AhmedAbdAlKareem1/gradheatmap-tf.git
 
 ⚡ Quick Start
+
 from gradheatmap import HeatMap
 
 model_path = "your_model"
+
 image_path = "your_img_path"
 
 #class_names Can be mulit class ['cat','dog','rabbit']
@@ -96,9 +98,13 @@ image_path = "your_img_path"
 class_names = ["cat", "dog"]
 
 heat = HeatMap(
+
     model=model_path,
+    
     img_path=image_path,
+    
     class_names=class_names
+    
 )
 
 overlay = heat.overlay_heatmap()
@@ -106,15 +112,17 @@ overlay = heat.overlay_heatmap()
 heat.save_heat_img("result.jpg", overlay)
 
 Output:
+
 heatmap/
 └── result.jpg
+
 <p align="center">
   <img src="heatmap1.jpg" width="300">
   <img src="heatmap2.jpg" width="300">
   <img src="heatmap3.jpg" width="300">
 </p>
 
-    terminal OutPut 
+    terminal output 
     
 Detected Model : vgg16
 
@@ -178,6 +186,7 @@ Model must contain at least one Conv2D or DepthwiseConv2D layer.
 
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
 
 
 
