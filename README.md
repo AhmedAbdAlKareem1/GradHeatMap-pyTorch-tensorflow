@@ -82,17 +82,18 @@ Custom CNNs
 
 Install directly from GitHub:
 
-bash
+```bash
 pip install git+https://github.com/AhmedAbdAlKareem1/gradheatmap-tf.git
+```
 
 ⚡ Quick Start
 
-<pre>from gradheatmap import HeatMap
+```python
+from gradheatmap import HeatMap
 
 model_path = "your_model_path"
 image_path = "your_image_path"
 
-# class_names can be multi-class like ['cat', 'dog', 'rabbit']
 class_names = ["cat", "dog"]
 
 heat = HeatMap(
@@ -102,8 +103,8 @@ heat = HeatMap(
 )
 
 overlay = heat.overlay_heatmap()
-
-heat.save_heat_img("result.jpg", overlay) </pre>
+heat.save_heat_img("result.jpg", overlay)
+```
 
 Output:
 
@@ -177,6 +178,7 @@ Model must contain at least one Conv2D or DepthwiseConv2D layer.
 
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
 
 
 
