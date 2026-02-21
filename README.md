@@ -107,8 +107,9 @@ Output:
 heatmap/
 └── result.jpg
 <p align="center">
-  <img src="Heatmap_001_img2.jpg" width="300">
-  <img src="Heatmap_004_img5.jpg" width="300">
+  <img src="heatmap1.jpg" width="300">
+  <img src="heatmap2.jpg" width="300">
+  <img src="heatmap3.jpg" width="300">
 </p>
 
 Detected Model : mobilenetv2_1.00_224
@@ -180,6 +181,7 @@ Model must contain at least one Conv2D or DepthwiseConv2D layer.
 
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
 
 
 
