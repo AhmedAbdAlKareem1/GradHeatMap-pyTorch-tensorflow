@@ -94,7 +94,7 @@ from gradheatmap import HeatMap
 model_path = "your_model_path"
 image_path = "your_image_path"
 
-class_names = ["cat", "dog"]
+class_names = ["class0", "class1"] # can be multiclass
 
 heat = HeatMap(
     model_path=model_path,
@@ -124,7 +124,7 @@ Detected Model : vgg16
 Image Size = (224, 224)
 Using vgg16 specific preprocessing.
 Layer Name : block5_conv3
-Class: 0 Cat  Confidence: 100.00%
+Class: 0 class0  Confidence: 100.00%
 Successfully saved heatmap to: heatmap\heatmap.jpg
 ```
 
@@ -178,6 +178,7 @@ Model must contain at least one Conv2D or DepthwiseConv2D layer.
 
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
 
 
 
