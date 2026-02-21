@@ -1,6 +1,6 @@
 Automatic Grad-CAM for TensorFlow / Keras Models
 
-A robust and architecture-aware Grad-CAM implementation for TensorFlow / Keras models.
+A simple way to generate Grad-CAM heatmaps for TensorFlow/Keras models.
 
 GradHeatmap automatically adapts to:
 
@@ -174,6 +174,7 @@ Model must contain at least one Conv2D or DepthwiseConv2D layer.
 
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
 
 
 
