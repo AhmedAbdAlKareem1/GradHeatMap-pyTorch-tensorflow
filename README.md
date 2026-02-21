@@ -77,24 +77,14 @@ RegNet
 
 Custom CNNs
 
-🧱 Project Structure
-gradheatmap-project/
-├── gradheatmap/
-│   ├── __init__.py
-│   └── core.py         # HeatMap class
-├── examples/
-├── pyproject.toml
-└── README.md
 🚀 Installation
-Create Environment
-conda create -n gradheatmap python=3.10 -y
-conda activate gradheatmap
-Install Dependencies
-pip install tensorflow numpy opencv-python
+## Installation
 
-If installed as local package:
+Install directly from GitHub:
 
-pip install -e .
+bash
+pip install git+https://github.com/AhmedAbdAlKareem1/gradheatmap-tf.git
+
 ⚡ Quick Start
 from gradheatmap import HeatMap
 
@@ -110,24 +100,13 @@ heat = HeatMap(
 )
 
 overlay = heat.overlay_heatmap()
+
 heat.save_heat_img("result.jpg", overlay)
 
 Output:
-
 heatmap/
 └── result.jpg
-🎯 Explaining a Specific Class
 
-By default, GradHeatmap explains the predicted class.
-
-To force explanation of a specific class:
-
-heat = HeatMap(
-    model=model_path,
-    img_path=image_path,
-    class_names=class_names,
-    target_class=0
-)
 🧠 How It Works
 
 Loads model with compile=False to avoid custom loss conflicts.
@@ -173,5 +152,6 @@ Model must contain at least one Conv2D or DepthwiseConv2D layer.
 
 
 ## 📄 License
+
 
 This project is licensed under the MIT License - see the LICENSE file for details.
