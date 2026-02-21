@@ -107,8 +107,8 @@ Output:
 heatmap/
 └── result.jpg
 <p align="center">
-  <img src="Heatmap_001_img2.jpg" width="224">
-    <img src="Heatmap_004_img5.jpg" width="224">
+  <img src="Heatmap_001_img2.jpg" width="224",height=224>
+    <img src="Heatmap_004_img5.jpg" width="224",height=224>
 </p>
 
 <p align="center">
@@ -162,6 +162,7 @@ Model must contain at least one Conv2D or DepthwiseConv2D layer.
 
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
 
 
 
