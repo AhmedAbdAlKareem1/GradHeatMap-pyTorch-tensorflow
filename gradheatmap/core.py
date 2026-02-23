@@ -2,17 +2,22 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 import os
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import cv2
 
+
 class HeatMap:
-    def __init__(self, model, img_path, class_names, target_class=None):
+    def __init__(self, model, img_path, class_names, target_class=None,preprocess=None):
         # loads model with compile=false so we avoid custom loss / optimizer conflicts
         # since we only need it for inference (Grad-CAM), not training
-        
-
         # if model is already loaded                                 # load model from a path
         self.model = model if isinstance(model, tf.keras.Model) else load_model(model, compile=False)
+        #for custom scaling
+        #if none the model will try to detect it from the pre-trained model,
+        #if no pre-trained model,it will try to detect for internal scaling
+        #if non it will /255(standerd)
+        self.user_preprocess = preprocess
         # automatically detect if the loaded model contains a pre-trained backbone
         # (like vgg16, resnet50,...etc)
         # check detect_backbone_submodel() function for detection logic
@@ -282,66 +287,61 @@ class HeatMap:
         except Exception as E:
             print(f"Error in compute_gradcam: {E}")
             return None
-
     def get_preprocess_function(self):
-        #if there is a backbone model
-        #we get the name of that model
-        #and get the preprocess input function that the model Gives
-        name = self.backbone_name.lower()
+        mapping = {
+            "vgg16": tf.keras.applications.vgg16.preprocess_input,
+            "vgg19": tf.keras.applications.vgg19.preprocess_input,
+            "resnet": tf.keras.applications.resnet.preprocess_input,
+            "resnet50": tf.keras.applications.resnet.preprocess_input,
+            "resnetv2": tf.keras.applications.resnet_v2.preprocess_input,
+            "mobilenet": tf.keras.applications.mobilenet.preprocess_input,
+            "mobilenetv2": tf.keras.applications.mobilenet_v2.preprocess_input,
+            "mobilenetv3": tf.keras.applications.mobilenet_v3.preprocess_input,
+            "efficientnet": tf.keras.applications.efficientnet.preprocess_input,
+            "efficientnetv2": tf.keras.applications.efficientnet_v2.preprocess_input,
+            "densenet": tf.keras.applications.densenet.preprocess_input,
+            "inception": tf.keras.applications.inception_v3.preprocess_input,
+            "inceptionresnet": tf.keras.applications.inception_resnet_v2.preprocess_input,
+            "xception": tf.keras.applications.xception.preprocess_input,
+            "nasnet": tf.keras.applications.nasnet.preprocess_input,
+            "convnext": tf.keras.applications.convnext.preprocess_input,
+            "regnet": tf.keras.applications.regnet.preprocess_input,
+        }
+        p = self.user_preprocess
 
-        # VGG
-        if "vgg16" in name:
-            return tf.keras.applications.vgg16.preprocess_input
-        if "vgg19" in name:
-            return tf.keras.applications.vgg19.preprocess_input
+        # 1) User provided a callable -> use it
+        if callable(p):
+            print("Using USER preprocessing function.")
+            return p
 
-        # ResNet
-        if "resnet" in name and "v2" not in name:
-            return tf.keras.applications.resnet.preprocess_input
-        if "resnet" in name and "v2" in name:
-            return tf.keras.applications.resnet_v2.preprocess_input
+        # 2) User provided a string -> look it up
+        if isinstance(p, str):
+            key = p.lower().strip()
+            fn = mapping.get(key)
+            if fn is None:
+                raise ValueError(
+                    f"Unknown preprocess='{p}'. Pass a callable or one of: {sorted(mapping.keys())}"
+                )
+            print(f"Using USER preprocess='{p}'.")
+            return fn
 
-        # MobileNet
-        if "mobilenetv3" in name:
-            return tf.keras.applications.mobilenet_v3.preprocess_input
-        if "mobilenetv2" in name:
-            return tf.keras.applications.mobilenet_v2.preprocess_input
-        if "mobilenet" in name:
-            return tf.keras.applications.mobilenet.preprocess_input
+        # 3) No user preprocess -> try backbone_name
+        if self.backbone_name:
+            key = self.backbone_name.lower().strip()
 
-        # EfficientNet
-        if "efficientnetv2" in name:
-            return tf.keras.applications.efficientnet_v2.preprocess_input
-        if "efficientnet" in name:
-            return tf.keras.applications.efficientnet.preprocess_input
+            # Direct match
+            fn = mapping.get(key)
+            if fn is not None:
+                print(f"Using backbone preprocessing for '{self.backbone_name}'.")
+                return fn
 
-        # DenseNet
-        if "densenet" in name:
-            return tf.keras.applications.densenet.preprocess_input
+            # Fuzzy match (handles names like "resnet50_backbone", "vgg16_backbone")
+            for k, v in mapping.items():
+                if k in key:
+                    print(f"Using backbone preprocessing matched '{k}' from '{self.backbone_name}'.")
+                    return v
 
-        # Inception
-        if "inceptionresnet" in name:
-            return tf.keras.applications.inception_resnet_v2.preprocess_input
-        if "inception" in name:
-            return tf.keras.applications.inception_v3.preprocess_input
-
-        # Xception
-        if "xception" in name:
-            return tf.keras.applications.xception.preprocess_input
-
-        # NASNet
-        if "nasnet" in name:
-            return tf.keras.applications.nasnet.preprocess_input
-
-        # ConvNeXt
-        if "convnext" in name:
-            return tf.keras.applications.convnext.preprocess_input
-
-        # RegNet
-        if "regnet" in name:
-            return tf.keras.applications.regnet.preprocess_input
-        #if no backbone model
-        #return None
+        # 4) Nothing found
         return None
 
     def preprocess_image(self):
@@ -367,11 +367,16 @@ class HeatMap:
             # model input shape is (batch, height, width, channels)
             # so output shape becomes (1, H, W, 3)
             img = np.expand_dims(img, axis=0)
-
+            #if user set his own scaling
+            # user_fn = self.resolve_user_preprocess()
+            # #if its not non,use it
+            # if user_fn is not None:
+            #     print("Using USER preprocessing function.")
+            #     return user_fn(img)
             # if backbone_name exists:
             # it means we detected a known pre-trained backbone (resnet, vgg, ...etc)
             # so we should use the backbone preprocess_input
-            if self.backbone_name:
+            if self.backbone_name or self.user_preprocess:
 
                 # get preprocessing function based on backbone name
                 # example: resnet50 --> tf.keras.applications.resnet.preprocess_input
@@ -381,7 +386,6 @@ class HeatMap:
                 # if we found a matching preprocessing function
                 # we apply it directly and return the processed image
                 if process_func:
-                    print(f"Using {self.backbone_name} specific preprocessing.")
                     return process_func(img)
 
             # if no backbone preprocessing is used:
@@ -443,7 +447,6 @@ class HeatMap:
         # return None (Grad-CAM cannot be computed without a conv layer)
         print("No Convolution layer was found ")
         return None
-
 
     def predict(self, img):
         try:
@@ -521,9 +524,10 @@ class HeatMap:
 
         # return detected backbone model
         return backbone
+
     def save_heat_img(self, name, output_img):
         try:
-            #saving the heatmap Image
+            # saving the heatmap Image
             folder_name = 'heatmap'
             os.makedirs(folder_name, exist_ok=True)
 
@@ -542,6 +546,5 @@ class HeatMap:
             print(f"Successfully saved heatmap to: {save_path}")
         except Exception as E:
             print(E)
-
 
 
