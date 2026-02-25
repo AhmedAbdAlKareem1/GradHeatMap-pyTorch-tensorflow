@@ -6,6 +6,17 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import cv2
 
+class LinearDense(tf.keras.layers.Layer):
+    def __init__(self, source_layer, **kwargs):
+        super().__init__(**kwargs)
+        # Reference the existing kernel and bias directly
+        # No weight copying — we point to the same variables
+        self.w = source_layer.kernel
+        self.b = source_layer.bias
+
+    def call(self, inputs):
+        return tf.matmul(inputs, self.w) + self.b
+
 
 class HeatMap:
     def __init__(self, model, img_path, class_names, target_class=None,preprocess=None):
@@ -64,6 +75,8 @@ class HeatMap:
         # if None → we use predicted class
         # if provided → Grad-CAM will focus on that specific class
         self.target_class = target_class
+
+
 
     def overlay_heatmap(self, alpha=0.4):
         try:
@@ -134,159 +147,110 @@ class HeatMap:
         except Exception as E:
             print(E)
 
-    def compute_gradcam(self):
-        try:
-            # check preprocess_image() for more details
-            preprocessed_image = self.preprocess_image()
+    def build_grad_model(self):
+        conv_layer_name = self.last_conv_layer_get(self.pre_trained_model)
+        last_layer = self.model.layers[-1]
 
-            # inner_layers is the backbone model (if detected) or the full model (if no backbone)
-            # we use it because Grad-CAM needs access to the last convolution layer outputs
-            inner_layers = self.pre_trained_model
+        # Check if final layer has a non-linear activation (sigmoid, softmax, etc.)
+        has_activation = (
+                hasattr(last_layer, 'activation') and
+                last_layer.activation != tf.keras.activations.linear
+        )
 
-            # automatically find the last conv layer name inside the backbone / inner model
-            # check last_conv_layer_get() for detection logic
-            conv_layer_name = self.last_conv_layer_get(inner_layers)
+        # --- CASE 1: Nested backbone (VGG16, ResNet, etc.) ---
+        if self.pre_trained_model is not self.model:
 
-            # build a gradient model that outputs:
-            # 1) conv layer feature maps (for Grad-CAM)
-            # 2) final backbone output (features before the head)
-            grad_model = tf.keras.models.Model(
-                inputs=[inner_layers.input],
+            backbone_grad_model = tf.keras.models.Model(
+                inputs=self.pre_trained_model.inputs,
                 outputs=[
-                    inner_layers.get_layer(conv_layer_name).output,  # conv feature maps
-                    inner_layers.output  # backbone final features
+                    self.pre_trained_model.get_layer(conv_layer_name).output,
+                    self.pre_trained_model.output
                 ]
             )
 
-            # GradientTape tracks operations so we can compute gradients of the target class score
-            # with respect to the conv layer output
+            outer_input = self.model.inputs
+            conv_out, backbone_out = backbone_grad_model(outer_input)
+
+            x = backbone_out
+            head_started = False
+            for layer in self.model.layers:
+                if layer.name == self.backbone_name:
+                    head_started = True
+                    continue
+                if head_started:
+                    if layer == last_layer and has_activation:
+                        # Use tracked LinearDense instead of raw tf.matmul
+                        x = LinearDense(last_layer)(x)
+                    else:
+                        x = layer(x)
+
+            grad_model = tf.keras.models.Model(
+                inputs=outer_input,
+                outputs=[conv_out, x]
+            )
+
+        # --- CASE 2: Flat custom model ---
+        else:
+            if has_activation:
+                pre_act = self.model.layers[-2].output
+                # Use tracked LinearDense instead of raw tf.matmul
+                logit_output = LinearDense(last_layer)(pre_act)
+            else:
+                logit_output = self.model.output
+
+            grad_model = tf.keras.models.Model(
+                inputs=self.model.inputs,
+                outputs=[
+                    self.model.get_layer(conv_layer_name).output,
+                    logit_output
+                ]
+            )
+
+        return grad_model
+
+    def compute_gradcam(self):
+        try:
+            preprocessed_image = self.preprocess_image()
+            idx, name, conf, probs = self.predict(preprocessed_image)
+            grad_model = self.build_grad_model()
+
             with tf.GradientTape() as tape:
+                conv_outputs, predictions = grad_model(preprocessed_image)
 
-                # forward pass through grad_model:
-                # conv_outputs --> feature maps from the last conv layer
-                # last_layer_features --> the backbone output features
-                conv_outputs, last_layer_features = grad_model(preprocessed_image)
-
-                # x will represent the final output logits/probabilities AFTER passing through the model head
-                # start_chaining controls when to start applying layers AFTER the backbone / conv layer
-                x = last_layer_features
-                start_chaining = False
-
-                # if backbone_name is None:
-                # it means the model is custom and not using a known pre-trained backbone as a nested layer
-                # in this case we rebuild the forward path manually starting from conv_outputs
-                if self.backbone_name is None:
-
-                    # start from conv_outputs (the last conv layer output)
-                    # then apply the remaining layers of the full model after this conv layer
-                    x = conv_outputs
-
-                    for layer in self.model.layers:
-
-                        # once start_chaining becomes True, we apply layers sequentially
-                        if start_chaining:
-
-                            # special handling for the last layer if it's a Dense layer
-                            # sometimes calling layer(x) can create dtype issues
-                            # so we do manual matmul with kernel + bias
-                            if layer == self.model.layers[-1] and hasattr(layer, 'kernel'):
-                                x = tf.matmul(tf.cast(x, layer.kernel.dtype), layer.kernel) + layer.bias
-                            else:
-                                x = layer(x)
-
-                        # when we reach the last conv layer, we start chaining from the next layer onward
-                        if layer.name == conv_layer_name:
-                            start_chaining = True
-
-                # else backbone_name is NOT None:
-                # it means the model contains a known backbone (like resnet50, mobilenet, etc.)
-                # and we already have the backbone output (last_layer_features)
-                # so we skip the backbone layer and manually apply only the head layers
+                if predictions.shape[-1] == 1:
+                    explain_class = int(self.target_class) if self.target_class is not None else int(idx)
+                    raw = predictions[:, 0]
+                    loss = tf.math.log(raw + 1e-10) if explain_class == 1 else tf.math.log(1.0 - raw + 1e-10)
                 else:
+                    class_index = int(self.target_class) if self.target_class is not None else tf.argmax(predictions[0])
+                    loss = tf.math.log(predictions[:, class_index] + 1e-10)
 
-                    for layer in self.model.layers:
-
-                        # when we hit the backbone layer name, start chaining AFTER it
-                        if layer.name == self.backbone_name:
-                            start_chaining = True
-                            # skip the backbone layer itself because we already computed its output
-                            continue
-
-                        if start_chaining:
-
-                            # same last Dense layer handling for dtype safety
-                            if layer == self.model.layers[-1] and hasattr(layer, 'kernel'):
-                                x = tf.matmul(tf.cast(x, layer.kernel.dtype), layer.kernel) + layer.bias
-                            else:
-                                x = layer(x)
-
-                # predict class using the model's predict logic
-                # (usually used when target_class is None)
-                pred_class, pred_name, pred_conf, pred_probs = self.predict(preprocessed_image)
-
-                # compute the "loss" value we want to explain
-                # Grad-CAM needs a scalar score for the target class
-                if x.shape[-1] == 1:
-                    # binary classification case (sigmoid output)
-
-                    # decide which class to explain:
-                    # if user provided target_class --> use it
-                    # else --> use predicted class
-                    if self.target_class is not None:
-                        explain_class = int(self.target_class)
-                    else:
-                        explain_class = int(pred_class)
-
-                    # sigmoid output gives probability of class 1
-                    # so:
-                    # explain_class == 1 --> use x[:,0]
-                    # explain_class == 0 --> use (1 - x[:,0])
-                    loss = x[:, 0] if explain_class == 1 else (1.0 - x[:, 0])
-
-                else:
-                    # multi-class classification case (softmax / logits output)
-
-                    # if no target_class provided, take argmax as predicted class
-                    # else use user-selected target class index
-                    if self.target_class is None:
-                        class_index = tf.argmax(x[0])
-                    else:
-                        class_index = int(self.target_class)
-
-                    # select the score for the target class
-                    loss = x[:, class_index]
-
-            # compute gradients of the selected class score (loss)
-            # with respect to the conv feature maps (conv_outputs)
             grads = tape.gradient(loss, conv_outputs)
 
-            # Grad-CAM weights are global-average-pooled gradients across spatial dims
-            # pooled_grads shape: (channels,)
+            # Guard against None gradients before any operations
+            # This happens when the conv layer is disconnected from the loss in the graph
+            if grads is None:
+                raise ValueError(
+                    f"Gradients are None for layer targeted by Grad-CAM. "
+                    f"The conv layer output may be disconnected from the loss. "
+                    f"Check build_grad_model() graph connectivity."
+                )
+
             pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+            conv_outputs = conv_outputs.numpy()[0]
+            pooled_grads = pooled_grads.numpy()
 
-            # convert tensors to numpy for easier manipulation
-            conv_outputs = conv_outputs.numpy()[0]  # (H, W, C)
-            pooled_grads = pooled_grads.numpy()  # (C,)
-
-            # weight each channel in conv_outputs by its importance (pooled gradient)
             for i in range(pooled_grads.shape[-1]):
                 conv_outputs[:, :, i] *= pooled_grads[i]
 
-            # average across channels to get the final heatmap
             heatmap = np.mean(conv_outputs, axis=-1)
-
-            # apply ReLU to keep only positive contributions
             heatmap = np.maximum(heatmap, 0)
-
-            # normalize heatmap to [0, 1] range safely
             heatmap /= (np.max(heatmap) + 1e-10)
 
-            # return final 2D heatmap
             return heatmap
 
         except Exception as E:
-            print(f"Error in compute_gradcam: {E}")
-            return None
+            raise ValueError(f"Error in compute_gradcam: {E}")
     def get_preprocess_function(self):
         mapping = {
             "vgg16": tf.keras.applications.vgg16.preprocess_input,
@@ -360,19 +324,9 @@ class HeatMap:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
             # resize image to the expected model input size
-            # self.image_size is extracted automatically from model.input_shape in __init__
             img = cv2.resize(img, self.image_size)
-
-            # add batch dimension at axis=0
-            # model input shape is (batch, height, width, channels)
             # so output shape becomes (1, H, W, 3)
             img = np.expand_dims(img, axis=0)
-            #if user set his own scaling
-            # user_fn = self.resolve_user_preprocess()
-            # #if its not non,use it
-            # if user_fn is not None:
-            #     print("Using USER preprocessing function.")
-            #     return user_fn(img)
             # if backbone_name exists:
             # it means we detected a known pre-trained backbone (resnet, vgg, ...etc)
             # so we should use the backbone preprocess_input
@@ -411,7 +365,7 @@ class HeatMap:
                 return img / 255.0
 
         except Exception as E:
-            print(f"Preprocess Error: {E}")
+            raise ValueError(f"{E}")
 
     def last_conv_layer_get(self, model):
         # iterate over model layers in reverse order
@@ -469,27 +423,8 @@ class HeatMap:
                 print(f"Confidence: {conf * 100:.2f}%")
             return idx, name, conf, probs
 
-            # if preds.shape[-1] == 1:
-            #     # Binary case
-            #     score = float(preds[0])
-            #     class_index = 1 if score >= 0.5 else 0
-            #     confidence = score if class_index == 1 else (1.0 - score)
-            #     name = self.class_names[class_index] if self.class_names else str(class_index)
-            #     print(f"Class: {class_index} {name}  Confidence: {confidence * 100:.2f}%")
-            #     return class_index
-            #
-            # # Multi-class case
-            # class_index = int(np.argmax(preds))
-            # confidence = float(preds[class_index])
-            # name = self.class_names[class_index] if self.class_names else str(class_index)
-            #
-            # print(f"Class: {class_index} ({name})")
-            # print(f"Confidence: {confidence * 100:.2f}%")
-            # return class_index
-
         except Exception as e:
-            print(f"Predict Error: {e}")
-            return 0
+            raise ValueError(f"Predict Error: {e}")
 
     def detect_backbone_submodel(self):
 
@@ -506,7 +441,7 @@ class HeatMap:
         # in this case we treat the full model as the backbone
         if not candidates:
             print(f"No nested backbone. Using top model name: {self.model.name}")
-            return self.model
+            return None
 
         # if nested models exist:
         # we assume one of them is the backbone and the others (if any)
@@ -525,6 +460,8 @@ class HeatMap:
         # return detected backbone model
         return backbone
 
+
+
     def save_heat_img(self, name, output_img):
         try:
             # saving the heatmap Image
@@ -535,16 +472,12 @@ class HeatMap:
                 raise ValueError("save_heat_img got an empty output_img (None/empty).")
 
             save_path = os.path.join(folder_name, name)
-            if output_img is None:
-                return Exception
             ok = cv2.imwrite(save_path, output_img)
-            tf.keras.backend.clear_session()
 
             if not ok:
                 raise IOError(f"cv2.imwrite failed for path: {save_path}")
 
             print(f"Successfully saved heatmap to: {save_path}")
         except Exception as E:
-            print(E)
-
+            raise ValueError(f"{E}")
 
