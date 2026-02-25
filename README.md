@@ -61,7 +61,7 @@ heatmap/
 <img src="heatmap2.jpg" width="300">
 <img src="heatmap3.jpg" width="300">
 </p>
-Quick Start (PyTorch)
+#Quick Start (PyTorch)
 ```
 import torch
 import torch.nn as nn
@@ -103,6 +103,7 @@ heat.save_heat_img("result_torch.jpg", overlay)
 When running the generator, the library provides automated feedback on the model architecture:
 
 Plaintext
+```
 Detected Model : vgg16
 Detected Image Size = (224, 224)
 Detected Backbone = vgg16
@@ -123,6 +124,7 @@ PyTorch >= 1.x (Optional)
 
 License
 This project is licensed under the MIT License.
+
 
 
 
