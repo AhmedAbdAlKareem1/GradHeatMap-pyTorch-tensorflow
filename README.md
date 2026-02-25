@@ -87,6 +87,7 @@ heat = HeatMapPyTorch(
 overlay = heat.overlay_heatmap(alpha=0.4)
 heat.save_heat_img("result_torch.jpg", overlay)
 ```
+```
 Terminal Output Example
 When running the generator, the library provides automated feedback on the model architecture:
 
@@ -97,6 +98,7 @@ Detected Backbone = vgg16
 Last Convo Layer : block5_conv3
 Class: 0 class0  Confidence: 100.00%
 Successfully saved heatmap to: heatmap/result.jpg
+```
 Requirements
 Python >= 3.8
 
@@ -110,5 +112,6 @@ PyTorch >= 1.x (Optional)
 
 License
 This project is licensed under the MIT License.
+
 
 
