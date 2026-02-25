@@ -21,12 +21,12 @@ Validation: Built-in safe output validation and fallback normalization.
 Installation
 Install the package directly from GitHub:
 
-Bash```
+```
 pip install git+https://github.com/AhmedAbdAlKareem1/gradheatmap.git
 ```
 Optional Extras
 To install dependencies for specific frameworks:
-```Bash
+```
 # For TensorFlow
 pip install "gradheatmap[tf]"
 
@@ -113,6 +113,7 @@ PyTorch >= 1.x (Optional)
 
 License
 This project is licensed under the MIT License.
+
 
 
 
