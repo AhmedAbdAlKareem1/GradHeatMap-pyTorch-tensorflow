@@ -67,24 +67,27 @@ import torch
 import torch.nn as nn
 from torchvision import models
 from gradheatmap import HeatMapPyTorch
-
+```
 
 # Rebuild architecture
+```
 def build_resnet50(num_classes=2):
     model = models.resnet50(weights=None)
     model.fc = nn.Linear(model.fc.in_features, num_classes)
     return model
-
+```
 
 # Load checkpoint
+```
 ckpt = torch.load("resnet50_catdog_best.pth", map_location="cpu")
 
 model = build_resnet50(num_classes=2)
 model.load_state_dict(ckpt["model_state_dict"])
 model.eval()
 
-
+```
 # Generate Grad-CAM
+```
 heat = HeatMapPyTorch(
     model=model,
     img_path="image.jpg",
@@ -96,7 +99,7 @@ heat = HeatMapPyTorch(
 overlay = heat.overlay_heatmap(alpha=0.4)
 heat.save_heat_img("result_torch.jpg", overlay)
 ```
-Terminal Output Example
+#Terminal Output Example
 When running the generator, the library provides automated feedback on the model architecture:
 
 Plaintext
@@ -120,6 +123,7 @@ PyTorch >= 1.x (Optional)
 
 License
 This project is licensed under the MIT License.
+
 
 
 
