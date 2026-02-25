@@ -1,13 +1,26 @@
 [project]
 name = "gradheatmap"
-version = "0.1.0"
-description = "Simple Grad-CAM heatmap generator for TensorFlow/Keras models"
+version = "0.2.0"
+description = "Automatic Grad-CAM heatmap generator for TensorFlow/Keras and PyTorch models"
 readme = "README.md"
-license = {text = "MIT"}
-authors = [{name="AhmedAbdAlKareem1"}]
-dependencies = [
-    "tensorflow>=2.10",
-    "numpy<2",
-    "opencv-python>=4.7"
-]
+license = { text = "MIT" }
+authors = [{ name = "AhmedAbdAlKareem1" }]
 requires-python = ">=3.8"
+dependencies = [
+  "numpy<2",
+  "opencv-python>=4.7"
+]
+
+[project.optional-dependencies]
+tf = ["tensorflow>=2.10"]
+torch = ["torch", "torchvision"]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
