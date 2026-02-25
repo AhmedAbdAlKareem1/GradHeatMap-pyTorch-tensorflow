@@ -5,4 +5,5 @@ try:
 except Exception:
     HeatMapPyTorch = None
 
-__all__ = ["HeatMaptensorflow", "HeatMapPyTorch"]
+__all__ = ["HeatMap", "HeatMapPyTorch"]
+
