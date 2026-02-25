@@ -1,204 +1,110 @@
-Automatic Grad-CAM for TensorFlow / Keras Models
+GradHeatmap
+GradHeatmap is a Python library designed to simplify the generation of Grad-CAM (Gradient-weighted Class Activation Mapping) heatmaps. It automates the process of backbone detection and layer identification for both TensorFlow/Keras and PyTorch models, removing the need for manual architecture inspection or hardcoded layer names.
 
-A simple way to generate Grad-CAM heatmaps for TensorFlow/Keras models.
+<p align="center">
+<img src="heatmap1.jpg" width="300">
+<img src="heatmap2.jpg" width="300">
+<img src="heatmap3.jpg" width="300">
+</p>
 
-GradHeatmap automatically adapts to:
+Features
+Framework Agnostic: Unified support for TensorFlow/Keras (.keras, .h5) and PyTorch models.
 
-Binary classification models (sigmoid)
+Automatic Detection: Automatically identifies backbones (ResNet, VGG, MobileNet, EfficientNet, etc.) and the final convolutional layer.
 
-Multi-class classification models (softmax)
+Classification Support: Works with binary (sigmoid/single logit) and multi-class (softmax/multi-logit) outputs.
 
-Transfer learning models with pretrained backbones
+Smart Preprocessing: Detects internal tf.keras.layers.Rescaling in TensorFlow and provides ImageNet normalization for PyTorch.
 
-Fully custom CNN architectures
+Transfer Learning Ready: Seamlessly handles custom CNNs and models built via transfer learning.
 
-Models with internal Rescaling layers
+Visualization: OpenCV JET heatmap overlay with adjustable alpha blending.
 
-Models requiring backbone-specific preprocessing
+Validation: Built-in safe output validation and fallback normalization.
 
-No manual layer selection.
-No hardcoded preprocessing.
-No architecture rewriting.
+Installation
+Install the package directly from GitHub:
 
-✨ Key Features
+Bash
+pip install git+https://github.com/AhmedAbdAlKareem1/gradheatmap.git
+Optional Extras
+To install dependencies for specific frameworks:
 
-🔍 Automatic Backbone Detection
-Detects nested pretrained models (ResNet, MobileNet, EfficientNet, etc.) using parameter heuristics.
+Bash
+# For TensorFlow
+pip install "gradheatmap[tf]"
 
-🧠 Automatic Last Convolution Layer Detection
-Traverses model structure to locate the correct convolution layer.
-
-⚖️ Binary & Multi-Class Support
-Handles:
-
-(None, 1) sigmoid outputs
-
-(None, N) softmax outputs
-
-⚙️ Smart Preprocessing Logic
-
-Uses correct preprocess_input for detected backbone
-
-Detects internal tf.keras.layers.Rescaling
-
-Falls back to safe [0, 1] normalization
-
-🎨 Heatmap Overlay
-
-OpenCV colormap (JET)
-
-Alpha blending
-
-Safe normalization
-
-Output validation
-
-🧩 Works With:
-
-VGG16 / VGG19
-
-ResNet / ResNetV2
-
-MobileNet / MobileNetV2 / V3
-
-EfficientNet / EfficientNetV2
-
-DenseNet
-
-Inception / InceptionResNet
-
-Xception
-
-NASNet
-
-ConvNeXt
-
-RegNet
-
-Custom CNNs
-
-🚀 Installation
-## Installation
-
-Install directly from GitHub:
-
-```bash
-pip install git+https://github.com/AhmedAbdAlKareem1/gradheatmap-tf.git
-```
-
-⚡ Quick Start
-
-```python
+# For PyTorch
+pip install "gradheatmap[torch]"
+Quick Start (TensorFlow / Keras)
+Python
 from gradheatmap import HeatMap
 
-model_path = "your_model_path"
-image_path = "your_image_path"
-
-class_names = ["class0", "class1"] # can be multiclass
+model_path = "your_model.keras"   # Supports .keras or .h5
+image_path = "your_image.jpg"
+class_names = ["class0", "class1"]
 
 heat = HeatMap(
-    model_path=model_path,
+    model=model_path,
     img_path=image_path,
     class_names=class_names
 )
 
-overlay = heat.overlay_heatmap()
+overlay = heat.overlay_heatmap(alpha=0.4)
 heat.save_heat_img("result.jpg", overlay)
-```
+Project Structure Output:
 
-Output:
-
+Plaintext
 heatmap/
 └── result.jpg
+Quick Start (PyTorch)
+Python
+import torch
+import torch.nn as nn
+from torchvision import models
+from gradheatmap import HeatMapPyTorch
 
-<p align="center">
-  <img src="heatmap1.jpg" width="300">
-  <img src="heatmap2.jpg" width="300">
-  <img src="heatmap3.jpg" width="300">
-</p>
+def build_resnet50(num_classes=2):
+    m = models.resnet50(weights=None)
+    m.fc = nn.Linear(m.fc.in_features, num_classes)
+    return m
 
-### 🖥 Terminal Output
+# Load model and weights
+ckpt = torch.load("resnet50_catdog_best.pth", map_location="cpu")
+model = build_resnet50(num_classes=2)
+model.load_state_dict(ckpt["model_state_dict"])
+model.eval()
 
-```bash
+heat = HeatMapPyTorch(
+    model=model,
+    img_path="image.jpg",
+    class_names=ckpt.get("class_names", ["Cat", "Dog"]),
+    preprocess="resnet50",
+    image_size=(224, 224)
+)
+
+overlay = heat.overlay_heatmap(alpha=0.4)
+heat.save_heat_img("result_torch.jpg", overlay)
+Terminal Output Example
+When running the generator, the library provides automated feedback on the model architecture:
+
+Plaintext
 Detected Model : vgg16
-Image Size = (224, 224)
-Using vgg16 specific preprocessing.
-Layer Name : block5_conv3
+Detected Image Size = (224, 224)
+Detected Backbone = vgg16
+Last Convo Layer : block5_conv3
 Class: 0 class0  Confidence: 100.00%
-Successfully saved heatmap to: heatmap\heatmap.jpg
-```
+Successfully saved heatmap to: heatmap/result.jpg
+Requirements
+Python >= 3.8
 
-🧠 How It Works
+OpenCV
 
-Loads model with compile=False to avoid custom loss conflicts.
+NumPy
 
-Detects backbone submodel (if exists).
+TensorFlow >= 2.x (Optional)
 
-Locates last convolution layer.
+PyTorch >= 1.x (Optional)
 
-Builds gradient model dynamically.
-
-Computes gradients of target class score.
-
-Applies channel-wise importance weighting.
-
-Generates normalized heatmap.
-
-Blends heatmap over original image.
-
-🛡 Design Philosophy
-
-GradHeatmap was built to:
-
-Avoid hardcoded layer names.
-
-Avoid manual architecture inspection.
-
-Avoid preprocessing mistakes.
-
-Work reliably across multiple CNN families.
-
-It is designed to be model-agnostic.
-
-⚠️ Requirements
-
-tensorflow>=2.10
-
-numpy<2
-
-opencv-python>=4.7
-
-requires-python>=3.8
-
-Model must contain at least one Conv2D or DepthwiseConv2D layer.
-
-
-
-## 📄 License
-
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+License
+This project is licensed under the MIT License.
