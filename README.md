@@ -26,14 +26,16 @@ pip install git+https://github.com/AhmedAbdAlKareem1/gradheatmap.git
 ```
 Optional Extras
 To install dependencies for specific frameworks:
-```
 # For TensorFlow
+```
 pip install "gradheatmap[tf]"
-
+```
 # For PyTorch
+```
 pip install "gradheatmap[torch]"
+```
 Quick Start (TensorFlow / Keras)
-Python
+```
 from gradheatmap import HeatMap
 
 model_path = "your_model.keras"   # Supports .keras or .h5
@@ -60,7 +62,7 @@ heatmap/
 <img src="heatmap3.jpg" width="300">
 </p>
 Quick Start (PyTorch)
-bash```
+```
 import torch
 import torch.nn as nn
 from torchvision import models
@@ -113,6 +115,7 @@ PyTorch >= 1.x (Optional)
 
 License
 This project is licensed under the MIT License.
+
 
 
 
