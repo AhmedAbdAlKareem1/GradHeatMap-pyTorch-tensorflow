@@ -2,7 +2,7 @@
 name = "gradheatmap"
 version = "0.2.0"
 description = "Automatic Grad-CAM heatmap generator for TensorFlow/Keras and PyTorch models"
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "MIT" }
 authors = [{ name = "AhmedAbdAlKareem1" }]
 requires-python = ">=3.8"
@@ -15,9 +15,14 @@ dependencies = [
 tf = ["tensorflow>=2.10"]
 torch = ["torch", "torchvision"]
 
+[project.urls]
+Homepage = "https://github.com/AhmedAbdAlKareem1/GradHeatMap-pyTorch-tensorflow"
+Issues = "https://github.com/AhmedAbdAlKareem1/GradHeatMap-pyTorch-tensorflow/issues"
+
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["gradheatmap"]
+license-files = ["LICENSE"]
