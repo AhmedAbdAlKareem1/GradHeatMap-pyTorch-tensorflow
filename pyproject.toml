@@ -1,6 +1,6 @@
 [project]
 name = "gradheatmap"
-version = "0.2.0"
+version = "0.2.1"
 description = "Automatic Grad-CAM heatmap generator for TensorFlow/Keras and PyTorch models"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = "MIT"
@@ -8,17 +8,27 @@ license-files = ["LICENSE"]
 authors = [{ name = "AhmedAbdAlKareem1" }]
 requires-python = ">=3.8"
 dependencies = [
-  "numpy<2",
-  "opencv-python>=4.7"
+  "numpy>=1.21,<3",
+  "opencv-python>=4.7",
 ]
 
 [project.optional-dependencies]
-tf = ["tensorflow>=2.10"]
-torch = ["torch", "torchvision"]
+tf    = ["tensorflow>=2.10"]
+torch = ["torch>=1.10", "torchvision"]
+dev   = [
+  "pytest>=7",
+  "pytest-cov",
+  "build",
+  "twine",
+]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["gradheatmap"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["gradheatmap*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
